@@ -57,8 +57,7 @@ data GuildRequest a where
   -- todo AddGuildMember           :: ToJSON o => GuildId -> UserId -> o
                                 -- -> GuildRequest GuildMember
   -- | Modify attributes of a guild 'Member'. Fires a Guild Member Update 'Event'.
-  -- todo ModifyGuildMember        :: ToJSON o => GuildId -> UserId -> o
-                                -- -> GuildRequest ()
+  ModifyGuildMember        :: GuildId -> UserId -> ModifyGuildMemberOpts -> GuildRequest ()
   -- | Remove a member from a guild. Requires 'KICK_MEMBER' permission. Fires a
   --   Guild Member Remove 'Event'.
   RemoveGuildMember        :: GuildId -> UserId -> GuildRequest ()
@@ -195,6 +194,24 @@ guildMembersTimingToQuery (GuildMembersTiming mLimit mAfter) =
               Just aft -> "after" R.=: show aft
   in limit <> after
 
+
+-- | https://discordapp.com/developers/docs/resources/guild#modify-guild-member
+data ModifyGuildMemberOpts = ModifyGuildMemberOpts
+  { modifyGuildMemberOptsNick      :: Maybe T.Text
+  , modifyGuildMemberOptsRoles     :: Maybe [RoleId]
+  , modifyGuildMemberOptsMute      :: Maybe Bool
+  , modifyGuildMemberOptsDeaf      :: Maybe Bool
+  , modifyGuildMemberOptsChannelId :: Maybe ChannelId
+  } deriving (Show, Eq, Ord)
+
+instance ToJSON ModifyGuildMemberOpts where
+  toJSON ModifyGuildMemberOpts{..} =  object [(name, val) | (name, Just val) <-
+                                        [("nick",        toJSON <$> modifyGuildMemberOptsNick ),
+                                         ("roles",       toJSON <$> modifyGuildMemberOptsRoles ),
+                                         ("mute",        toJSON <$> modifyGuildMemberOptsMute ),
+                                         ("deaf",        toJSON <$> modifyGuildMemberOptsDeaf ),
+                                         ("channel_id",  toJSON <$> modifyGuildMemberOptsChannelId )] ]
+
 guildMajorRoute :: GuildRequest a -> String
 guildMajorRoute c = case c of
   (GetGuild g) ->                         "guild " <> show g
@@ -206,7 +223,7 @@ guildMajorRoute c = case c of
   (GetGuildMember g _) ->            "guild_memb " <> show g
   (ListGuildMembers g _) ->         "guild_membs " <> show g
   -- (AddGuildMember g _ _) ->          "guild_memb " <> show g
-  -- (ModifyGuildMember g _ _) ->       "guild_memb " <> show g
+  (ModifyGuildMember g _ _) ->         "guild_memb " <> show g
   (RemoveGuildMember g _) ->         "guild_memb " <> show g
   (GetGuildBans g) ->                "guild_bans " <> show g
   (CreateGuildBan g _ _) ->           "guild_ban " <> show g
@@ -269,9 +286,9 @@ guildJsonRequest c = case c of
   -- (AddGuildMember guild user patch) ->
       -- Put (guilds // guild /: "members" // user) (R.ReqBodyJson patch) mempty
 
-  -- (ModifyGuildMember guild member patch) ->
-      -- let body = R.ReqBodyJson patch
-      -- in Patch (guilds // guild /: "members" // member) body mempty
+  (ModifyGuildMember guild user patch) ->
+      let body = R.ReqBodyJson patch
+      in Patch (guilds // guild /: "members" // user) body mempty
 
   (RemoveGuildMember guild user) ->
       Delete (guilds // guild /: "members" // user) mempty
