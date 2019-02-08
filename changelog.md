@@ -1,6 +1,18 @@
 # Changelog
 
-Go to the [dev branch](https://github.com/aquarial/discord-haskell/blob/dev/changelog.md) for changes not merged into master yet
+View on github for newest version: https://github.com/aquarial/discord-haskell/blob/master/changelog.md
+
+### master
+
+Message Author changed from `User` to `Either WebhookId User`
+
+Add Webhook ADT
+
+Add requests: GetInvite, DeleteInvite
+
+UpdateStatusVoiceOpts takes Bool for Mute
+
+`Unavailable` becomes `GuildUnavailable`
 
 ### 0.7.1
 

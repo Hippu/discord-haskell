@@ -11,8 +11,8 @@ restExample :: IO ()
 restExample = do
   tok <- T.strip <$> TIO.readFile "./examples/auth-token.secret"
   dis <- loginRest (Auth tok)
+  --  replace these!
   let chanid = 517170652092825610
-      -- guildid = 453207241294610444
 
   chan <- restCall dis (GetChannel chanid)
   putStrLn ("Channel object: " <> show chan <> "\n")
@@ -28,6 +28,7 @@ restExample = do
                                              -- type \:emoji: in discord
                   putStrLn ("Reaction resp: " <> show r1)
     _ -> putStrLn "Creating the message failed, couldn't react"
+
 
   stopDiscord dis
 
