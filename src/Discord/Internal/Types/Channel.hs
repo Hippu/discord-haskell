@@ -6,7 +6,6 @@ module Discord.Internal.Types.Channel where
 
 import Control.Applicative (empty)
 import Data.Aeson
-import Data.ByteString ()
 import Data.Aeson.Types (Parser)
 import Data.Default (Default, def)
 import Data.Monoid ((<>))
