@@ -1,4 +1,6 @@
-# discord-haskell [![Build Status](https://travis-ci.org/aquarial/discord-haskell.png?branch=master)](https://travis-ci.org/aquarial/discord-haskell)
+# discord-haskell           [![Build Status](https://travis-ci.org/aquarial/discord-haskell.png?branch=master)](https://travis-ci.org/aquarial/discord-haskell)        [![Hackage version](http://img.shields.io/hackage/v/discord-haskell.svg?label=Hackage)](https://hackage.haskell.org/package/discord-haskell)
+
+Build that discord bot in Haskell! This is an example bot that replies "pong" to messages that start with "ping".
 
 ```haskell
 {-# LANGUAGE OverloadedStrings #-}  -- allows "string literals" to be Text
@@ -44,8 +46,8 @@ In `stack.yaml`
 
 ```yaml
 extra-deps:
-- discord-haskell-1.1.3
 - emoji-0.1.0.2
+- discord-haskell-VERSION
 ```
 
 In `project.cabal`
@@ -80,6 +82,27 @@ A custom emoji will look like `<name:id_number>` or `name:id_number`.
 
 See [examples/ping-pong.hs](https://github.com/aquarial/discord-haskell/blob/master/examples/ping-pong.hs)
  for a `CreateReaction` request in use.
+ 
+### Embeds
+
+Embeds are special messages with boarders and images. [Example embed created by discord-haskell](./examples/embed-photo.jpg)
+
+The `Embed` record (and sub-records) store embed data received from Discord.
+
+The `CreateEmbed` record stores data when we want to create an embed.
+
+`CreateEmbed` has a `Default` instance, so you only need to specify the fields you use:
+
+```haskell
+_ <- restCall dis (R.CreateMessageEmbed <channel_id> "Pong!" $
+        def { createEmbedTitle = "Pong Embed"
+            , createEmbedImage = Just $ CreateEmbedImageUpload <bytestring>
+            , createEmbedThumbnail = Just $ CreateEmbedImageUrl
+                    "https://avatars2.githubusercontent.com/u/37496339"
+            })
+```
+
+Uploading a file each time is slow, prefer uploading images to a hosting site like imgur.com, and then referencing them.
  
 ### Limitations
 

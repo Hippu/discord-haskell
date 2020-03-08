@@ -8,8 +8,9 @@ import Data.Time.Clock
 import Data.Aeson
 import qualified Data.Text as T
 
-import Discord.Internal.Types.Channel
 import Discord.Internal.Types.Prelude
+import Discord.Internal.Types.Channel (Channel)
+import Discord.Internal.Types.User (User)
 
 -- | Representation of a guild member.
 data GuildMember = GuildMember
@@ -184,13 +185,13 @@ instance FromJSON VoiceRegion where
                 <*> o .: "custom"
 
 -- | Info about a Ban
-data Ban = Ban
-      { banReason  :: T.Text
-      , banUser    :: User
+data GuildBan = GuildBan
+      { guildBanReason  :: T.Text
+      , guildBanUser    :: User
       } deriving (Show, Eq, Ord)
 
-instance FromJSON Ban where
-  parseJSON = withObject "Ban" $ \o -> Ban <$> o .: "reason" <*> o .: "user"
+instance FromJSON GuildBan where
+  parseJSON = withObject "GuildBan" $ \o -> GuildBan <$> o .: "reason" <*> o .: "user"
 
 -- | Represents a code to add a user to a guild
 data Invite = Invite

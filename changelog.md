@@ -4,7 +4,34 @@ View on github for newest version: https://github.com/aquarial/discord-haskell/b
 
 ## master
 
+
+## 1.4.0
+
+Rename `SubEmbed` to `EmbedPart`
+
+New and improved Embed API: Add `CreateEmbed` record and `createEmbed :: CreateEmbed -> Embed`
+
+`CreateEmbedImageUpload` implementation inspired by [Flutterlice](https://github.com/aquarial/discord-haskell/pull/32)
+
+## 1.3.0
+
+[PixeLinc](https://github.com/aquarial/discord-haskell/pull/33) Add `DeleteSingleReaction` rest-request, Add GuildId to `ReactinInfo`, Add `MESSAGE_REACTION_REMOVE_EMOJI` gateway event
+
+`GetReactions` actually returns the User objects request
+
+Rename `Ban` to `GuildBan`
+
+Re-export UTCTime from `time` package
+
+## 1.2.0
+
 [MDeltaX](https://github.com/aquarial/discord-haskell/pull/27) Fixed typo: depreciated --> deprecated
+
+[MDeltaX](https://github.com/aquarial/discord-haskell/pull/29) More consistency: RoleID --> RoleId
+
+[MDeltaX](https://github.com/aquarial/discord-haskell/pull/29) Fix ModifyGuildRole: Post --> Patch && optional args
+
+[Hippu](https://github.com/aquarial/discord-haskell/pull/31) Won't crash on integer-nonces in ChannelMessage-events (usually strings)
 
 ## 1.1.3
 

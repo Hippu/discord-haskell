@@ -1,12 +1,12 @@
 cabal-version:       2.0
 name:                discord-haskell
 -- library version is also noted at src/Discord/Rest/Prelude.hs
-version:             1.1.3
+version:             1.4.0
 description:         Functions and data types to write discord bots.
                      Official discord docs <https://discordapp.com/developers/docs/reference>.
                      .
-                     See the project wiki for quickstart notes
-                     <https://github.com/aquarial/discord-haskell/wiki>
+                     See the project readme for quickstart notes
+                     <https://github.com/aquarial/discord-haskell#discord-haskell->
 synopsis:            Write bots for Discord in Haskell
 homepage:            https://github.com/aquarial/discord-haskell
 bug-reports:         https://github.com/aquarial/discord-haskell/issues
@@ -63,6 +63,8 @@ library
                      , Discord.Internal.Types.Events
                      , Discord.Internal.Types.Gateway
                      , Discord.Internal.Types.Guild
+                     , Discord.Internal.Types.User
+                     , Discord.Internal.Types.Embed
   build-depends:
                        base >=4 && <5
                      , aeson >=1.3.1.1 && <1.5

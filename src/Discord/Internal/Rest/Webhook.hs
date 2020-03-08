@@ -16,11 +16,12 @@ module Discord.Internal.Rest.Webhook
 import Data.Aeson
 import Data.Monoid (mempty, (<>))
 import qualified Data.Text as T
-import Network.HTTP.Req ((/:))
-import qualified Network.HTTP.Req as R
+import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
-import Network.HTTP.Client (RequestBody (RequestBodyLBS))
-import Network.HTTP.Client.MultipartFormData (partFileRequestBody)
+import           Network.HTTP.Req ((/:))
+import qualified Network.HTTP.Req as R
+import Network.HTTP.Client (RequestBody (RequestBodyBS))
+import Network.HTTP.Client.MultipartFormData (partBS, partFileRequestBody)
 
 import Discord.Internal.Rest.Prelude
 import Discord.Internal.Types
@@ -74,15 +75,15 @@ data ExecuteWebhookWithTokenOpts = ExecuteWebhookWithTokenOpts
   deriving (Show, Eq, Ord)
 
 data WebhookContent = WebhookContentText T.Text
-                    | WebhookContentFile T.Text BL.ByteString
-                    | WebhookContentEmbeds [Embed]
+                    | WebhookContentFile T.Text B.ByteString
+                    | WebhookContentEmbeds [CreateEmbed]
   deriving (Show, Eq, Ord)
 
 webhookContentJson :: WebhookContent -> [(T.Text, Value)]
 webhookContentJson c = case c of
                       WebhookContentText t -> [("content", toJSON t)]
                       WebhookContentFile _ _  -> []
-                      WebhookContentEmbeds e -> [("embeds", toJSON e)]
+                      WebhookContentEmbeds e -> [("embeds", toJSON (createEmbed <$> e))]
 
 instance ToJSON ExecuteWebhookWithTokenOpts where
   toJSON ExecuteWebhookWithTokenOpts{..} = object $ [(name, val) | (name, Just val) <-
@@ -126,10 +127,10 @@ webhookJsonRequest ch = case ch of
     Get (baseUrl /: "webhooks" // w /: t)  mempty
 
   (ModifyWebhook w patch) ->
-    Patch (baseUrl /: "webhooks" // w) (R.ReqBodyJson patch)  mempty
+    Patch (baseUrl /: "webhooks" // w) (pure (R.ReqBodyJson patch))  mempty
 
   (ModifyWebhookWithToken w t p) ->
-    Patch (baseUrl /: "webhooks" // w /: t) (R.ReqBodyJson p)  mempty
+    Patch (baseUrl /: "webhooks" // w /: t) (pure (R.ReqBodyJson p))  mempty
 
   (DeleteWebhook w) ->
     Delete (baseUrl /: "webhooks" // w)  mempty
@@ -140,9 +141,20 @@ webhookJsonRequest ch = case ch of
   (ExecuteWebhookWithToken w tok o) ->
     case executeWebhookWithTokenOptsContent o of
       WebhookContentFile name text  ->
-        let part = partFileRequestBody "file" (T.unpack name) (RequestBodyLBS text)
+        let part = partFileRequestBody "file" (T.unpack name) (RequestBodyBS text)
             body = R.reqBodyMultipart [part]
         in Post (baseUrl /: "webhooks" // w /: tok) body mempty
-      _ ->
+      WebhookContentText _ ->
         let body = pure (R.ReqBodyJson o)
+        in Post (baseUrl /: "webhooks" // w /: tok) body mempty
+      WebhookContentEmbeds embeds ->
+        let mkPart (name,content) = partFileRequestBody name (T.unpack name) (RequestBodyBS content)
+            uploads CreateEmbed{..} = [(n,c) | (n, Just (CreateEmbedImageUpload c)) <-
+                                          [ ("author.png", createEmbedAuthorIcon)
+                                          , ("thumbnail.png", createEmbedThumbnail)
+                                          , ("image.png", createEmbedImage)
+                                          , ("footer.png", createEmbedFooterIcon) ]]
+            parts =  map mkPart (concatMap uploads embeds)
+            partsJson = [partBS "payload_json" $ BL.toStrict $ encode $ toJSON $ object ["embed" .= createEmbed e] | e <- embeds]
+            body = R.reqBodyMultipart (partsJson ++ parts)
         in Post (baseUrl /: "webhooks" // w /: tok) body mempty

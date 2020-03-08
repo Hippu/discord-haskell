@@ -25,7 +25,7 @@ authHeader auth =
   where
   -- | https://discordapp.com/developers/docs/reference#user-agent
   -- Second place where the library version is noted
-  agent = "DiscordBot (https://github.com/aquarial/discord-haskell, 1.1.3)"
+  agent = "DiscordBot (https://github.com/aquarial/discord-haskell, 1.4.0)"
 
 -- Append to an URL
 infixl 5 //
@@ -37,8 +37,8 @@ infixl 5 //
 data JsonRequest where
   Delete ::                 R.Url 'R.Https ->      R.Option 'R.Https -> JsonRequest
   Get    ::                 R.Url 'R.Https ->      R.Option 'R.Https -> JsonRequest
-  Patch  :: R.HttpBody a => R.Url 'R.Https -> a -> R.Option 'R.Https -> JsonRequest
   Put    :: R.HttpBody a => R.Url 'R.Https -> a -> R.Option 'R.Https -> JsonRequest
+  Patch  :: R.HttpBody a => R.Url 'R.Https -> RestIO a -> R.Option 'R.Https -> JsonRequest
   Post   :: R.HttpBody a => R.Url 'R.Https -> RestIO a -> R.Option 'R.Https -> JsonRequest
 
 class Request a where

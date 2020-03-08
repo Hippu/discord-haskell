@@ -22,8 +22,9 @@ import Data.Emoji (unicodeByName)
 import Data.Monoid (mempty, (<>))
 import qualified Data.Text as T
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Lazy as BL
 import Network.HTTP.Client (RequestBody (RequestBodyBS))
-import Network.HTTP.Client.MultipartFormData (partFileRequestBody)
+import Network.HTTP.Client.MultipartFormData (partFileRequestBody, partBS, PartM)
 import Network.HTTP.Req ((/:))
 import qualified Network.HTTP.Req as R
 
@@ -49,7 +50,7 @@ data ChannelRequest a where
   -- | Sends a message to a channel.
   CreateMessage           :: ChannelId -> T.Text -> ChannelRequest Message
   -- | Sends a message with an Embed to a channel.
-  CreateMessageEmbed      :: ChannelId -> T.Text -> Embed -> ChannelRequest Message
+  CreateMessageEmbed      :: ChannelId -> T.Text -> CreateEmbed -> ChannelRequest Message
   -- | Sends a message with a file to a channel.
   CreateMessageUploadFile :: ChannelId -> T.Text -> B.ByteString -> ChannelRequest Message
   -- | Add an emoji reaction to a message. ID must be present for custom emoji
@@ -58,12 +59,14 @@ data ChannelRequest a where
   DeleteOwnReaction       :: (ChannelId, MessageId) -> T.Text -> ChannelRequest ()
   -- | Remove a Reaction someone else added
   DeleteUserReaction      :: (ChannelId, MessageId) -> UserId -> T.Text -> ChannelRequest ()
+  -- | Deletes all reactions of a single emoji on a message
+  DeleteSingleReaction    :: (ChannelId, MessageId) -> T.Text -> ChannelRequest ()
   -- | List of users that reacted with this emoji
-  GetReactions            :: (ChannelId, MessageId) -> T.Text -> (Int, ReactionTiming) -> ChannelRequest ()
+  GetReactions            :: (ChannelId, MessageId) -> T.Text -> (Int, ReactionTiming) -> ChannelRequest [User]
   -- | Delete all reactions on a message
   DeleteAllReactions      :: (ChannelId, MessageId) -> ChannelRequest ()
   -- | Edits a message content.
-  EditMessage             :: (ChannelId, MessageId) -> T.Text -> Maybe Embed
+  EditMessage             :: (ChannelId, MessageId) -> T.Text -> Maybe CreateEmbed
                                                     -> ChannelRequest Message
   -- | Deletes a message.
   DeleteMessage           :: (ChannelId, MessageId) -> ChannelRequest ()
@@ -94,11 +97,13 @@ data ChannelRequest a where
 -- | Data constructor for GetReaction requests
 data ReactionTiming = BeforeReaction MessageId
                     | AfterReaction MessageId
+                    | LatestReaction
 
 reactionTimingToQuery :: ReactionTiming -> R.Option 'R.Https
 reactionTimingToQuery t = case t of
   (BeforeReaction snow) -> "before" R.=: show snow
   (AfterReaction snow) -> "after"  R.=: show snow
+  (LatestReaction) -> mempty
 
 -- | Data constructor for GetChannelMessages requests. See <https://discordapp.com/developers/docs/resources/channel#get-channel-messages>
 data MessageTiming = AroundMessage MessageId
@@ -186,6 +191,7 @@ channelMajorRoute c = case c of
   (CreateReaction (chan, _) _) ->     "add_react " <> show chan
   (DeleteOwnReaction (chan, _) _) ->      "react " <> show chan
   (DeleteUserReaction (chan, _) _ _) ->   "react " <> show chan
+  (DeleteSingleReaction (chan, _) _) ->   "react " <> show chan
   (GetReactions (chan, _) _ _) ->         "react " <> show chan
   (DeleteAllReactions (chan, _)) ->       "react " <> show chan
   (EditMessage (chan, _) _ _) ->        "get_msg " <> show chan
@@ -211,8 +217,15 @@ cleanupEmoji emoji =
     (_, Just a) -> "custom:" <> a
     (_, Nothing) -> noAngles
 
-maybeEmbed :: Maybe Embed -> [(T.Text, Value)]
-maybeEmbed = maybe [] $ \embed -> ["embed" .= embed]
+maybeEmbed :: Maybe CreateEmbed -> [PartM IO]
+maybeEmbed = --maybe [] $ \embed -> ["embed" .= createEmbed embed]
+      let mkPart (name,content) = partFileRequestBody name (T.unpack name) (RequestBodyBS content)
+          uploads CreateEmbed{..} = [(n,c) | (n, Just (CreateEmbedImageUpload c)) <-
+                                          [ ("author.png", createEmbedAuthorIcon)
+                                          , ("thumbnail.png", createEmbedThumbnail)
+                                          , ("image.png", createEmbedImage)
+                                          , ("footer.png", createEmbedFooterIcon) ]]
+      in maybe [] (map mkPart . uploads)
 
 -- | The base url (Req) for API requests
 baseUrl :: R.Url 'R.Https
@@ -228,7 +241,7 @@ channelJsonRequest c = case c of
       Get (channels // chan) mempty
 
   (ModifyChannel chan patch) ->
-      Patch (channels // chan) (R.ReqBodyJson patch) mempty
+      Patch (channels // chan) (pure (R.ReqBodyJson patch)) mempty
 
   (DeleteChannel chan) ->
       Delete (channels // chan) mempty
@@ -247,8 +260,8 @@ channelJsonRequest c = case c of
       in Post (channels // chan /: "messages") body mempty
 
   (CreateMessageEmbed chan msg embed) ->
-      let content = ["content" .= msg] <> maybeEmbed (Just embed)
-          body = pure $ R.ReqBodyJson $ object content
+      let partJson = partBS "payload_json" $ BL.toStrict $ encode $ toJSON $ object ["content" .= msg, "embed" .= createEmbed embed]
+          body = R.reqBodyMultipart (partJson : maybeEmbed (Just embed))
       in Post (channels // chan /: "messages") body mempty
 
   (CreateMessageUploadFile chan fileName file) ->
@@ -269,6 +282,10 @@ channelJsonRequest c = case c of
       let e = cleanupEmoji emoji
       in Delete (channels // chan /: "messages" // msgid /: "reactions" /: e // uID ) mempty
 
+  (DeleteSingleReaction (chan, msgid) emoji) ->
+    let e = cleanupEmoji emoji
+    in Delete (channels // chan /: "messages" // msgid /: "reactions" /: e) mempty
+
   (GetReactions (chan, msgid) emoji (n, timing)) ->
       let e = cleanupEmoji emoji
           n' = if n < 1 then 1 else (if n > 100 then 100 else n)
@@ -279,8 +296,8 @@ channelJsonRequest c = case c of
       Delete (channels // chan /: "messages" // msgid /: "reactions" ) mempty
 
   (EditMessage (chan, msg) new embed) ->
-      let content = ["content" .= new] <> maybeEmbed embed
-          body = R.ReqBodyJson $ object content
+      let partJson = partBS "payload_json" $ BL.toStrict $ encode $ toJSON $ object ["content" .= new]
+          body = R.reqBodyMultipart (partJson : maybeEmbed embed)
       in Patch (channels // chan /: "messages" // msg) body mempty
 
   (DeleteMessage (chan, msg)) ->
